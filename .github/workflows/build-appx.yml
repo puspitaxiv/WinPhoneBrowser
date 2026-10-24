@@ -15,14 +15,14 @@ jobs:
       - name: Probe definisi target AppxPackage
         shell: pwsh
         run: |
-          $f = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild" -Recurse -Include *.targets -ErrorAction SilentlyContinue |
-            Select-String -Pattern '<Target Name="AppxPackage"' -List | Select-Object -First 3
-          foreach ($m in $f) { Write-Host "DEF: $($m.Path)" }
-          $x = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\WindowsXaml" -Recurse -Include Microsoft.Windows.UI.Xaml.CSharp.targets -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($x) {
-            Write-Host "--- import ber-condition di: $($x.FullName)"
-            Select-String -Path $x.FullName -Pattern "AppxPackage|Packaging" | Select-Object -First 15 | ForEach-Object { Write-Host "IMP: $($_.Line.Trim())" }
-          }
+          $files = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Include *.targets -ErrorAction SilentlyContinue
+          $files += Get-ChildItem "C:\Program Files (x86)\MSBuild" -Recurse -Include *.targets -ErrorAction SilentlyContinue
+          $files += Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild" -Recurse -Include *.targets,*.props -ErrorAction SilentlyContinue
+          Write-Host "TOTAL FILES: $($files.Count)"
+          $hits = $files | Select-String -Pattern 'Target Name="AppxPackage"' -List | Select-Object -First 5
+          foreach ($m in $hits) { Write-Host "DEF: $($m.Path)" }
+          $hit2 = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Include MakeAppx.exe,Signtool.exe -ErrorAction SilentlyContinue | Select-Object -First 8
+          foreach ($e in $hit2) { Write-Host "TOOL: $($e.FullName)" }
 
       - name: Siapkan sertifikat signing
         shell: pwsh
