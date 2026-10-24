@@ -35,8 +35,12 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
-          $dtout = & $msbuild "src\WPMobileBrowser.csproj" /dt /p:Configuration=Release /p:Platform=ARM 2>&1 | Out-String
-          ($dtout -split "`n") | Where-Object { $_ -match "Appx" } | Select-Object -First 40 | ForEach-Object { Write-Host "DT: $($_.Trim())" }
+          $apx = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.AppXPackage.Targets"
+          Write-Host "GREP1: definisi target Appx* di AppXPackage.Targets:"
+          Select-String -Path $apx -Pattern '<Target Name="Appx' | Select-Object -First 15 | ForEach-Object { Write-Host "  $($_.Line.Trim().Substring(0,[Math]::Min(150,$_.Line.Trim().Length)))" }
+          Write-Host "GREP2: kondisi di sekitar definisi (5 baris sebelum):"
+          $hit = Select-String -Path $apx -Pattern '<Target Name="AppxPackage"' | Select-Object -First 1
+          if ($hit) { Get-Content $apx | Select-Object -Skip ([Math]::Max(0,$hit.LineNumber-8)) -First 12 | ForEach-Object { Write-Host "  $($_.Trim().Substring(0,[Math]::Min(170,$_.Trim().Length)))" } } else { Write-Host "  (tidak ada <Target Name=AppxPackage> literal)" }
           exit 1
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
