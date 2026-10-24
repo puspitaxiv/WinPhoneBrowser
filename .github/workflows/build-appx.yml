@@ -37,14 +37,25 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
-            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true `
             /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
-            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx\" `
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
             /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "build gagal" }
-          Get-ChildItem "output\appx" -Recurse -Include *.appx,*.appxbundle | Select-Object FullName, Length
+          & $msbuild "src\WPMobileBrowser.csproj" /t:AppxPackage `
+            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true `
+            /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
+            /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
+            /p:PackageCertificatePassword=wpmobile `
+            /v:minimal
+          if ($LASTEXITCODE -ne 0) { throw "AppxPackage gagal" }
+          Write-Host "--- isi output\appx:"
+          Get-ChildItem "output\appx" -Recurse -File | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
+          Write-Host "--- isi bin\ARM\Release:"
+          Get-ChildItem "src\bin\ARM\Release" -Recurse -Include *.appx -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "BIN: $($_.FullName) ($($_.Length) B)"; Copy-Item $_.FullName "output\appx\" -Force }
 
       - name: Diagnostik bila gagal
         if: failure()
