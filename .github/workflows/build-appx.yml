@@ -60,6 +60,11 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
+          & $msbuild "src\WPMobileBrowser.csproj" /pp:merged.xml /p:Configuration=Release /p:Platform=ARM /v:minimal | Out-Null
+          Select-String -Path "merged.xml" -Pattern 'Target Name="AppxPackage"|Import Project=".*AppXPackage' | Select-Object -First 6 | ForEach-Object { Write-Host "PP: $($_.Line.Trim().Substring(0, [Math]::Min(200, $_.Line.Trim().Length)))" }
+          Write-Host "PP-GATE:"
+          Select-String -Path "merged.xml" -Pattern 'VisualStudioVersion.*7012|ImplicitlyExpandTargetFramework|Condition.*AppxPackage' | Select-Object -First 8 | ForEach-Object { Write-Host "G: $($_.Line.Trim().Substring(0, [Math]::Min(180, $_.Line.Trim().Length)))" }
+          Remove-Item "merged.xml" -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
