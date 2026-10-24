@@ -8,6 +8,8 @@
     <ProjectTypeGuids>{A5A43C5B-DE2A-4C0A-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
     <RuntimeIdentifiers>win10-arm;win10-aot;win10-x86;win10-x64</RuntimeIdentifiers>
     <FileAlignment>512</FileAlignment>
+    <RootNamespace>WPMobileBrowser</RootNamespace>
+    <AssemblyName>WPMobileBrowser</AssemblyName>
     <UAPToolsetVersion Condition="'$(UAPToolsetVersion)' == ''">17</UAPToolsetVersion>
     <DefaultLanguage>id-ID</DefaultLanguage>
     <AppContainerApplication>true</AppContainerApplication>
