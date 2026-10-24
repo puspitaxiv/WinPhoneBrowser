@@ -85,7 +85,7 @@ jobs:
             $raw = Get-Content "src\Package.appxmanifest" -Raw
             $raw = $raw.Replace('$targetnametoken$.exe', 'WPMobileBrowser.exe')
             $raw = $raw.Replace('Language="x-generate"', 'Language="en-US"')
-            $raw = $raw.Replace('<Identity Name="wpmobile.browser"', '<Identity ProcessorArchitecture="ARM" Name="wpmobile.browser"')
+            $raw = $raw.Replace('<Identity Name="wpmobile.browser"', '<Identity ProcessorArchitecture="arm" Name="wpmobile.browser"')
             Set-Content -Path "$staging\AppxManifest.xml" -Value $raw -Encoding UTF8
           }
           Get-Content "$staging\AppxManifest.xml" | Select-Object -First 12 | ForEach-Object { Write-Host "MFL: $_" }
