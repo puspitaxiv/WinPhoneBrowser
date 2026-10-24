@@ -57,7 +57,7 @@ namespace WPMobileBrowser
 
         private void BtnHome_Click(object sender, RoutedEventArgs e) => Navigate(HomeUrl);
 
-        private void Web_NavigationStarted(WebView sender, WebViewNavigationStartedEventArgs args)
+        private void Web_NavigationStarting(WebView sender, WebViewNavigationStartingEventArgs args)
         {
             Bar.Visibility = Visibility.Visible;
             UrlBox.Text = args.Uri.ToString();

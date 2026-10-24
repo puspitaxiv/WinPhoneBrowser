@@ -28,7 +28,7 @@
         </Grid>
 
         <Grid Grid.Row="1">
-            <WebView x:Name="Web" NavigationStarted="Web_NavigationStarted" NavigationCompleted="Web_NavigationCompleted" />
+            <WebView x:Name="Web" NavigationStarting="Web_NavigationStarting" NavigationCompleted="Web_NavigationCompleted" />
             <ProgressBar x:Name="Bar" Height="4" VerticalAlignment="Top" IsIndeterminate="True" Visibility="Collapsed" />
         </Grid>
     </Grid>
