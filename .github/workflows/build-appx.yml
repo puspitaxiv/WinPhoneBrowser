@@ -12,30 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe definisi target AppxPackage
-        shell: pwsh
-        run: |
-          $files = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Include *.targets -ErrorAction SilentlyContinue
-          $files += Get-ChildItem "C:\Program Files (x86)\MSBuild" -Recurse -Include *.targets -ErrorAction SilentlyContinue
-          $files += Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild" -Recurse -Include *.targets,*.props -ErrorAction SilentlyContinue
-          Write-Host "TOTAL FILES: $($files.Count)"
-          $hits = $files | Select-String -Pattern 'Target Name="AppxPackage"' -List | Select-Object -First 5
-          foreach ($m in $hits) { Write-Host "DEF: $($m.Path)" }
-          $hit2 = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Include MakeAppx.exe,Signtool.exe -ErrorAction SilentlyContinue | Select-Object -First 8
-          foreach ($e in $hit2) { Write-Host "TOOL: $($e.FullName)" }
-          $appx = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.AppXPackage.Targets"
-          if (Test-Path $appx) {
-            Write-Host "ADAK: $($appx)"
-            Select-String -Path $appx -Pattern 'Target Name="AppxPackage"|<Import Project=' | Select-Object -First 10 | ForEach-Object { Write-Host "APX: $($_.Line.Trim())" }
-          } else {
-            Write-Host "ADAK: TIDAK ADA $appx"
-          }
-          $ux = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\WindowsXaml" -Recurse -Include *.targets -ErrorAction SilentlyContinue | Select-Object -First 3
-          foreach ($u in $ux) {
-            Write-Host "UXAML: $($u.FullName)"
-            Select-String -Path $u.FullName -Pattern "<Import" | Select-Object -First 10 | ForEach-Object { Write-Host "IMP: $($_.Line.Trim())" }
-          }
-
       - name: Siapkan sertifikat signing
         shell: pwsh
         run: |
@@ -51,7 +27,6 @@ jobs:
           Write-Host "Thumbprint: $($cert.Thumbprint)"
 
       - name: Restore & build ARM .appx (sideload)
-        continue-on-error: true
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -60,11 +35,6 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
-          & $msbuild "src\WPMobileBrowser.csproj" /pp:merged.xml /p:Configuration=Release /p:Platform=ARM /v:minimal | Out-Null
-          Select-String -Path "merged.xml" -Pattern 'Target Name="AppxPackage"|Import Project=".*AppXPackage' | Select-Object -First 6 | ForEach-Object { Write-Host "PP: $($_.Line.Trim().Substring(0, [Math]::Min(200, $_.Line.Trim().Length)))" }
-          Write-Host "PP-GATE:"
-          Select-String -Path "merged.xml" -Pattern 'VisualStudioVersion.*7012|ImplicitlyExpandTargetFramework|Condition.*AppxPackage' | Select-Object -First 8 | ForEach-Object { Write-Host "G: $($_.Line.Trim().Substring(0, [Math]::Min(180, $_.Line.Trim().Length)))" }
-          Remove-Item "merged.xml" -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
@@ -73,22 +43,17 @@ jobs:
             /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "build gagal" }
-          Write-Host "=== isi src\obj\ARM\Release (root):"
-          Get-ChildItem "src\obj\ARM\Release" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "OBJ: $($_.Name)" }
-          Write-Host "=== isi src\bin\ARM\Release:"
-          Get-ChildItem "src\bin\ARM\Release" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "BIN: $($_.Name)" }
-          $mf = "src\obj\ARM\Release\AppxManifest.xml"
-          if (Test-Path $mf) { Write-Host "=== AppxManifest.xml generated:"; Get-Content $mf | ForEach-Object { Write-Host "MF: $_" } } else { Write-Host "MF: TIDAK ADA AppxManifest.xml di obj" }
+          if ($LASTEXITCODE -ne 0) { throw "build+package gagal" }
+          Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
 
       - name: Diagnostik bila gagal
         if: failure()
         shell: pwsh
         run: |
-          $f = "src\obj\ARM\Release\XamlTypeInfo.g.cs"
-          if (Test-Path $f) { Get-Content $f | Select-Object -First 60 | ForEach-Object { Write-Host "GCS: $_" } }
-          Write-Host "--- SDK yang tersedia:"
-          Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\UnionMetadata" -Directory -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "UM: $($_.Name)" }
+          Write-Host "--- isi src\bin\ARM\Release:"
+          Get-ChildItem "src\bin\ARM\Release" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "BIN: $($_.Name)" }
+          $mf = Get-ChildItem "src" -Recurse -Filter AppxManifest.xml -ErrorAction SilentlyContinue | Select-Object -First 3
+          foreach ($m in $mf) { Write-Host "MF: $($m.FullName)"; Get-Content $m.FullName | ForEach-Object { Write-Host "  $_" } }
 
       - name: Kemas artefak
         uses: actions/upload-artifact@v4

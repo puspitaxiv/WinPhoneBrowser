@@ -15,6 +15,7 @@
     <UAPToolsetVersion Condition="'$(UAPToolsetVersion)' == ''">17</UAPToolsetVersion>
     <DefaultLanguage>id-ID</DefaultLanguage>
     <AppContainerApplication>true</AppContainerApplication>
+    <WindowsAppContainer>true</WindowsAppContainer>
     <ApplicationType>Windows Store</ApplicationType>
     <TargetPlatformIdentifier>UAP</TargetPlatformIdentifier>
     <TargetPlatformVersion Condition=" '$(TargetPlatformVersion)' == '' ">10.0.19041.0</TargetPlatformVersion>
@@ -96,5 +97,4 @@
     <VisualStudioVersion>15.0</VisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
-  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\Microsoft.AppXPackage.Targets" Condition="Exists('$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\AppxPackage\Microsoft.AppXPackage.Targets')" />
 </Project>
