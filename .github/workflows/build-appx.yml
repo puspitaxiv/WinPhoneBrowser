@@ -1,0 +1,52 @@
+name: Build Browser WP (.appx)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Bangun & tanda tangan .appx (ARM)
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Siapkan sertifikat signing
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Subject "CN=WPMobileBrowser" `
+            -CertStoreLocation Cert:\CurrentUser\My -Type Custom `
+            -KeyExportPolicy Exportable -HashAlgorithm Sha256 -KeyLength 2048 `
+            -NotAfter (Get-Date).AddYears(5) `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+          $pwd = ConvertTo-SecureString -String "wpmobile" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath "src\WPMobileBrowser_TemporaryKey.pfx" -Password $pwd | Out-Null
+          New-Item -ItemType Directory -Force -Path output | Out-Null
+          Export-Certificate -Cert $cert -FilePath "output\WPMobileBrowser.cer" | Out-Null
+          Write-Host "Thumbprint: $($cert.Thumbprint)"
+
+      - name: Restore & build ARM .appx (sideload)
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild tidak ditemukan di runner" }
+          Write-Host "MSBuild: $msbuild"
+          & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
+          if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
+          & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
+            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
+            /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
+            /p:PackageCertificatePassword=wpmobile `
+            /v:minimal
+          if ($LASTEXITCODE -ne 0) { throw "build gagal" }
+          New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
+          Copy-Item "src\bin\ARM\Release\AppxPackages\**\*.appx*" "output\appx\" -Force
+
+      - name: Kemas artefak
+        uses: actions/upload-artifact@v4
+        with:
+          name: BrowserWP-appx
+          path: output/
