@@ -26,7 +26,7 @@ jobs:
           Export-Certificate -Cert $cert -FilePath "output\WPMobileBrowser.cer" | Out-Null
           Write-Host "Thumbprint: $($cert.Thumbprint)"
 
-      - name: Restore & build ARM .appx (sideload)
+      - name: Restore & build ARM
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -37,24 +37,88 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
-            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
-            /p:GenerateAppxPackageOnBuild=true /p:AppxPackageNeedRemoteSigning=false `
+            /p:Configuration=Release /p:Platform=ARM `
             /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
             /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
             /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "=== hook otomatis gagal, coba adapter target AppxPackage"
-            & $msbuild "src\WPMobileBrowser.csproj" /t:AppxPackage `
-              /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
-              /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
-              /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
-              /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
-              /p:PackageCertificatePassword=wpmobile `
-              /v:minimal
-            if ($LASTEXITCODE -ne 0) { throw "packaging gagal" }
+          if ($LASTEXITCODE -ne 0) { throw "build gagal" }
+          $n = (Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle -ErrorAction SilentlyContinue).Count
+          Write-Host "JUMLAH-APPX: $n"
+
+      - name: Coba target AppxPackage (bila build biasa tak menghasilkan .appx)
+        if: ${{ success() }}
+        shell: pwsh
+        run: |
+          $n = (Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle -ErrorAction SilentlyContinue).Count
+          if ($n -gt 0) { Write-Host "sudah ada .appx dari tahap Build, lewati"; exit 0 }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          & $msbuild "src\WPMobileBrowser.csproj" /t:AppxPackage `
+            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
+            /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
+            /p:PackageCertificatePassword=wpmobile `
+            /v:minimal
+          if ($LASTEXITCODE -ne 0) { Write-Host "target AppxPackage gagal, akan pakai makeappx manual" }
+          $n2 = (Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle -ErrorAction SilentlyContinue).Count
+          Write-Host "JUMLAH-APPX2: $n2"
+
+      - name: Kemasan manual makeappx + signtool (fallback)
+        if: ${{ success() }}
+        shell: pwsh
+        run: |
+          $n = (Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle -ErrorAction SilentlyContinue).Count
+          if ($n -gt 0) { Write-Host "sudah ada .appx, lewati manual pack"; exit 0 }
+          Write-Host "=== PAKET MANUAL ==="
+          # 1. manifest hasil build (token sudah diganti MSBuild) atau substitusi manual
+          $mf = Get-ChildItem "src\obj" -Recurse -Filter AppxManifest.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+          $staging = "output\staging"
+          New-Item -ItemType Directory -Force -Path $staging | Out-Null
+          if ($mf) {
+            Write-Host "MF-GEN: $($mf.FullName)"
+            Copy-Item $mf.FullName "$staging\AppxManifest.xml"
+          } else {
+            Write-Host "MF: tidak ada hasil build, substitusi manual Package.appxmanifest"
+            $raw = Get-Content "src\Package.appxmanifest" -Raw
+            $raw = $raw.Replace('$targetnametoken$.exe', 'WPMobileBrowser.exe')
+            $raw = $raw.Replace('Language="x-generate"', 'Language="en-US"')
+            $raw = $raw.Replace('<Identity Name="wpmobile.browser"', '<Identity ProcessorArchitecture="ARM" Name="wpmobile.browser"')
+            Set-Content -Path "$staging\AppxManifest.xml" -Value $raw -Encoding UTF8
           }
+          Get-Content "$staging\AppxManifest.xml" | Select-Object -First 12 | ForEach-Object { Write-Host "MFL: $_" }
+          # 2. payload dari bin\ARM\Release (tanpa pdb)
+          $bin = "src\bin\ARM\Release"
+          if (-not (Test-Path $bin)) { throw "payload tidak ditemukan: $bin" }
+          Get-ChildItem $bin -File | Where-Object { $_.Extension -ne '.pdb' } | Copy-Item -Destination $staging
+          Get-ChildItem $staging -File | ForEach-Object { Write-Host "PAY: $($_.Name) ($($_.Length) B)" }
+          # 3. makeappx pack
+          $makeappx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10" -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'x64|x86|Certification' } | Select-Object -First 1
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -Last 1
+          if (-not $makeappx) { throw "makeappx.exe tidak ditemukan" }
+          if (-not $signtool) { throw "signtool.exe tidak ditemukan" }
+          Write-Host "MAKEAPPX: $($makeappx.FullName)"
+          $appx = "output\appx\BrowserWP_1.0.0.0_ARM.appx"
+          & $makeappx.FullName pack /d $staging /p $appx /o /v
+          if ($LASTEXITCODE -ne 0) { throw "makeappx gagal" }
+          & $signtool.FullName sign /f "src\WPMobileBrowser_TemporaryKey.pfx" /p wpmobile /fd sha256 `
+            /tr http://timestamp.digicert.com /td sha256 $appx
+          if ($LASTEXITCODE -ne 0) { throw "signtool gagal" }
+          # 4. dependensi framework (untuk HP yang belum punya)
+          New-Item -ItemType Directory -Force -Path "output\appx\dependencies" | Out-Null
+          $vclibs = Get-ChildItem "C:\Program Files\Microsoft Visual Studio" -Recurse `
+            -Filter "Microsoft.VCLibs.140.00.UWPARM*.appx" -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'Debug' } | Select-Object -First 1
+          if ($vclibs) { Copy-Item $vclibs.FullName "output\appx\dependencies\"; Write-Host "DEP: $($vclibs.Name)" }
+          $n1 = Get-ChildItem "$env:USERPROFILE\.nuget\packages" -Recurse -Filter "Microsoft.NET.Native.Framework*ARM.appx" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch 'Debug|x86|x64|arm64' } | Sort-Object FullName | Select-Object -Last 1
+          $n2 = Get-ChildItem "$env:USERPROFILE\.nuget\packages" -Recurse -Filter "Microsoft.NET.Native.Runtime*ARM.appx" -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch 'Debug|x86|x64|arm64' } | Sort-Object FullName | Select-Object -Last 1
+          foreach ($d in @($n1, $n2)) { if ($d) { Copy-Item $d.FullName "output\appx\dependencies\"; Write-Host "DEP: $($d.Name)" } }
           Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
 
       - name: Diagnostik bila gagal
