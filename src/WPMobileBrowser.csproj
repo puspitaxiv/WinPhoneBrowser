@@ -5,7 +5,9 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">ARM</Platform>
     <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
-    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0A-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <ProjectTypeGuids>{A5A43C5B-DE2A-4C0A-9213-0A381AF9435A};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC};{C7167F0D-BC9F-4E6E-AFE1-012C56B48DB5}</ProjectTypeGuids>
+    <WindowsStoreApp>true</WindowsStoreApp>
+    <IsPackable>false</IsPackable>
     <RuntimeIdentifiers>win10-arm;win10-aot;win10-x86;win10-x64</RuntimeIdentifiers>
     <FileAlignment>512</FileAlignment>
     <RootNamespace>WPMobileBrowser</RootNamespace>
