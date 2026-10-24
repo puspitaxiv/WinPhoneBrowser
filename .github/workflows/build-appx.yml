@@ -23,6 +23,18 @@ jobs:
           foreach ($m in $hits) { Write-Host "DEF: $($m.Path)" }
           $hit2 = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Include MakeAppx.exe,Signtool.exe -ErrorAction SilentlyContinue | Select-Object -First 8
           foreach ($e in $hit2) { Write-Host "TOOL: $($e.FullName)" }
+          $appx = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.AppXPackage.Targets"
+          if (Test-Path $appx) {
+            Write-Host "ADAK: $($appx)"
+            Select-String -Path $appx -Pattern 'Target Name="AppxPackage"|<Import Project=' | Select-Object -First 10 | ForEach-Object { Write-Host "APX: $($_.Line.Trim())" }
+          } else {
+            Write-Host "ADAK: TIDAK ADA $appx"
+          }
+          $ux = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\WindowsXaml" -Recurse -Include *.targets -ErrorAction SilentlyContinue | Select-Object -First 3
+          foreach ($u in $ux) {
+            Write-Host "UXAML: $($u.FullName)"
+            Select-String -Path $u.FullName -Pattern "<Import" | Select-Object -First 10 | ForEach-Object { Write-Host "IMP: $($_.Line.Trim())" }
+          }
 
       - name: Siapkan sertifikat signing
         shell: pwsh
@@ -39,6 +51,7 @@ jobs:
           Write-Host "Thumbprint: $($cert.Thumbprint)"
 
       - name: Restore & build ARM .appx (sideload)
+        continue-on-error: true
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -48,18 +61,20 @@ jobs:
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
-          & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
+          & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
             /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
             /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "build+package gagal" }
-          Write-Host "--- isi output\appx:"
-          Get-ChildItem "output\appx" -Recurse -File | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
-          Write-Host "--- isi bin\ARM\Release:"
-          Get-ChildItem "src\bin\ARM\Release" -Recurse -Include *.appx -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "BIN: $($_.FullName) ($($_.Length) B)"; Copy-Item $_.FullName "output\appx\" -Force }
+          if ($LASTEXITCODE -ne 0) { throw "build gagal" }
+          Write-Host "=== isi src\obj\ARM\Release (root):"
+          Get-ChildItem "src\obj\ARM\Release" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "OBJ: $($_.Name)" }
+          Write-Host "=== isi src\bin\ARM\Release:"
+          Get-ChildItem "src\bin\ARM\Release" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "BIN: $($_.Name)" }
+          $mf = "src\obj\ARM\Release\AppxManifest.xml"
+          if (Test-Path $mf) { Write-Host "=== AppxManifest.xml generated:"; Get-Content $mf | ForEach-Object { Write-Host "MF: $_" } } else { Write-Host "MF: TIDAK ADA AppxManifest.xml di obj" }
 
       - name: Diagnostik bila gagal
         if: failure()
