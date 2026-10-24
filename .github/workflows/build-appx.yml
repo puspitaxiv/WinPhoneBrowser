@@ -89,11 +89,35 @@ jobs:
             Set-Content -Path "$staging\AppxManifest.xml" -Value $raw -Encoding UTF8
           }
           Get-Content "$staging\AppxManifest.xml" | Select-Object -First 12 | ForEach-Object { Write-Host "MFL: $_" }
-          # 2. payload dari bin\ARM\Release (tanpa pdb)
+          # 2. payload dari bin\ARM\Release (rekursif, tanpa pdb)
           $bin = "src\bin\ARM\Release"
           if (-not (Test-Path $bin)) { throw "payload tidak ditemukan: $bin" }
-          Get-ChildItem $bin -File | Where-Object { $_.Extension -ne '.pdb' } | Copy-Item -Destination $staging
-          Get-ChildItem $staging -File | ForEach-Object { Write-Host "PAY: $($_.Name) ($($_.Length) B)" }
+          $binFull = (Resolve-Path $bin).Path + "\"
+          Get-ChildItem $bin -Recurse -File | Where-Object { $_.Extension -ne '.pdb' } | ForEach-Object {
+            $rel = $_.FullName.Substring($binFull.Length)
+            $dest = Join-Path $staging $rel
+            New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+            Copy-Item $_.FullName $dest -Force
+          }
+          # 2b. logo: manifest memakai nama tanpa .scale-100 — buat salinan dengan nama yang diminta
+          $assets = Join-Path $staging "Assets"
+          New-Item -ItemType Directory -Force -Path $assets | Out-Null
+          $pairs = @{
+            'Square150x150Logo.png' = 'Square150x150Logo.scale-100.png'
+            'Square44x44Logo.png'   = 'Square44x44Logo.scale-100.png'
+            'Wide310x150Logo.png'   = 'Wide310x150Logo.scale-100.png'
+            'SplashScreen.png'      = 'SplashScreen.scale-100.png'
+            'LockScreenLogo.png'    = 'LockScreenLogo.scale-100.png'
+            'StoreLogo.png'         = 'StoreLogo.png'
+          }
+          foreach ($k in $pairs.Keys) {
+            $target = Join-Path $assets $k
+            if (Test-Path $target) { continue }
+            foreach ($cand in @((Join-Path $assets $pairs[$k]), ("src\Assets\" + $pairs[$k]))) {
+              if (Test-Path $cand) { Copy-Item $cand $target; Write-Host "LOGO: $k <- $cand"; break }
+            }
+          }
+          Get-ChildItem $staging -Recurse -File | ForEach-Object { Write-Host "PAY: $($_.FullName.Substring($staging.Length)) ($($_.Length) B)" }
           # 3. makeappx pack
           $makeappx = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10" -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -match 'x64|x86|Certification' } | Select-Object -First 1
