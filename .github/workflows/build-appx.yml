@@ -61,7 +61,7 @@ jobs:
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
-          & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
+          & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
             /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
