@@ -35,6 +35,12 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
+          & $msbuild "src\WPMobileBrowser.csproj" /pp:merged.xml /p:Configuration=Release /p:Platform=ARM /v:quiet | Out-Null
+          $ln = (Select-String -Path "merged.xml" -Pattern 'Import Project="\$\(MsAppxPackageTargets\)"' | Select-Object -First 1).LineNumber
+          if ($ln) { Get-Content "merged.xml" | Select-Object -Skip ($ln - 3) -First 6 | ForEach-Object { Write-Host "PP: $($_.Trim())" } } else { Write-Host "PP: tidak menemukan import MsAppxPackageTargets" }
+          $t = Select-String -Path "merged.xml" -Pattern 'Target Name="AppxPackage"' | Select-Object -First 2
+          if ($t) { foreach ($x in $t) { Write-Host "PP: TARGET ADA di baris $($x.LineNumber)" } } else { Write-Host "PP: TARGET AppxPackage TIDAK ADA di merged" }
+          Remove-Item "merged.xml" -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
