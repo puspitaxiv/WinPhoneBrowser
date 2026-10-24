@@ -97,4 +97,8 @@
     <VisualStudioVersion>15.0</VisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
+  <Target Name="Pack" />
+  <Target Name="AppxPackage">
+    <CallTarget Targets="_GenerateAppxPackage" />
+  </Target>
 </Project>

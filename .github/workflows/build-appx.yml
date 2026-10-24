@@ -45,8 +45,8 @@ jobs:
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "=== hook otomatis gagal, coba target internal _GenerateAppxPackage"
-            & $msbuild "src\WPMobileBrowser.csproj" /t:_GenerateAppxPackage `
+            Write-Host "=== hook otomatis gagal, coba adapter target AppxPackage"
+            & $msbuild "src\WPMobileBrowser.csproj" /t:AppxPackage `
               /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
               /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
               /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
@@ -55,16 +55,6 @@ jobs:
               /v:minimal
             if ($LASTEXITCODE -ne 0) { throw "packaging gagal" }
           }
-          Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
-          New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
-          & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
-            /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
-            /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
-            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx" `
-            /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
-            /p:PackageCertificatePassword=wpmobile `
-            /v:minimal
-          if ($LASTEXITCODE -ne 0) { throw "build+package gagal" }
           Get-ChildItem "output\appx" -Recurse -File -Include *.appx,*.appxbundle | ForEach-Object { Write-Host "ART: $($_.FullName) ($($_.Length) B)" }
 
       - name: Diagnostik bila gagal
