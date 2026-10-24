@@ -35,10 +35,10 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
-          $dir = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage"
-          Get-ChildItem $dir -File | ForEach-Object { Write-Host "FILE: $($_.Name) ($($_.Length) B)" }
-          Get-ChildItem $dir -File | Select-String -Pattern 'Target Name="AppxPackage"' -List | ForEach-Object { Write-Host "DEF: $($_.Filename):$($_.LineNumber)" }
-          Get-ChildItem $dir -File | Select-String -Pattern 'Target Name="Appx' | Select-Object -First 20 | ForEach-Object { Write-Host "TGT: $($_.Filename): $($_.Line.Trim().Substring(0,[Math]::Min(140,$_.Line.Trim().Length)))" }
+          $apx = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VisualStudio\v17.0\AppxPackage\Microsoft.AppxPackage.Targets"
+          Select-String -Path $apx -Pattern 'Target Name="AppxPackage' | Select-Object -First 5 | ForEach-Object { Write-Host "TGT: baris $($_.LineNumber): $($_.Line.Trim().Substring(0,[Math]::Min(200,$_.Line.Trim().Length)))" }
+          $h = Select-String -Path $apx -Pattern '<Target Name="AppxPackage"' | Select-Object -First 1
+          if ($h) { Write-Host "KONTEKS:"; Get-Content $apx | Select-Object -Skip ($h.LineNumber - 2) -First 8 | ForEach-Object { Write-Host "K: $($_.Trim().Substring(0,[Math]::Min(220,$_.Trim().Length)))" } }
           exit 1
           New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" "/t:Build;AppxPackage" `
