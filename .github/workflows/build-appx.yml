@@ -35,15 +35,16 @@ jobs:
           Write-Host "MSBuild: $msbuild"
           & $msbuild "src\WPMobileBrowser.csproj" /t:Restore /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "restore gagal" }
+          New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
           & $msbuild "src\WPMobileBrowser.csproj" /t:Build `
             /p:Configuration=Release /p:Platform=ARM /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxBundle=Never /p:AppxSymbolPackageEnabled=false `
+            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\output\appx\" `
             /p:PackageCertificateKeyFile=WPMobileBrowser_TemporaryKey.pfx `
             /p:PackageCertificatePassword=wpmobile `
             /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "build gagal" }
-          New-Item -ItemType Directory -Force -Path "output\appx" | Out-Null
-          Copy-Item "src\bin\ARM\Release\AppxPackages\**\*.appx*" "output\appx\" -Force
+          Get-ChildItem "output\appx" -Recurse -Include *.appx,*.appxbundle | Select-Object FullName, Length
 
       - name: Kemas artefak
         uses: actions/upload-artifact@v4
