@@ -6,7 +6,7 @@
   IgnorableNamespaces="uap mp">
 
   <Identity Name="wpmobile.browser" Publisher="CN=WPMobileBrowser" Version="1.0.0.0" />
-  <mp:PhoneIdentity PhoneProductId="3f2a9c51-7b44-4e0d-9a3e-6c58d1f0b271" PhonePublisherId="00000000000000000000000000000000" />
+  <mp:PhoneIdentity PhoneProductId="3f2a9c51-7b44-4e0d-9a3e-6c58d1f0b271" PhonePublisherId="0d2b6e1f-9c4a-4f7b-8e3d-5a1c2b9d6e40" />
 
   <Properties>
     <DisplayName>Browser WP</DisplayName>
